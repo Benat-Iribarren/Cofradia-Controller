@@ -1,5 +1,5 @@
 /**
- * Representa una Pelota (Ball) con física 2D básica, incluyendo velocidad, aceleración y fricción.
+ * Representa una pelota con física 2D básica, incluyendo velocidad, aceleración y fricción.
  * La pelota gestiona su propio movimiento, las restricciones de los límites de la pantalla y su renderizado.
  */
 class Ball {
@@ -58,23 +58,18 @@ class Ball {
    * restringe la pelota para que no salga de los límites y la vuelve a dibujar.
    */
   public void update() {
-    // Limita la velocidad máxima para que no se mueva infinitamente rápido
     this.speedX = constrain(this.speedX, -maxSpeed, maxSpeed);
     this.speedY = constrain(this.speedY, -maxSpeed, maxSpeed);
     
-    // Aplica fricción para que la pelota vaya frenando gradualmente
     this.speedX *= friction;
     this.speedY *= friction;
     
-    // Actualiza la posición en X y la restringe a los límites definidos
     this.x += this.speedX;
     this.x = constrain(this.x, (size/2), width - (size/2));
     
-    // Actualiza la posición en Y y la restringe a los límites definidos
     this.y += this.speedY;
-    this.y = constrain(this.y, (size/2), height - size);
+    this.y = constrain(this.y, (size/2), height - (size/2));
     
-    // Dibuja la pelota en su nueva posición
     draw();
   }
   
@@ -93,4 +88,12 @@ class Ball {
   public float getY() {
     return this.y;
   }
+  
+    /**
+   * Obtiene el diametro de la pelota.
+   * * @return El diametro.
+   */
+   public float getSize() {
+     return this.size;
+   }
 }
