@@ -1,0 +1,4 @@
+class SerialDataInput {
+  public SerialDataInput() {
+  }
+}
