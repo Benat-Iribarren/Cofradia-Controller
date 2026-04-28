@@ -45,8 +45,10 @@ class GameController extends Thread {
   SerialData update(SerialData input) {
     SerialData output = new SerialData();
     
+    /** LOGICA DEL JUEGO 
+    SerialData output = new SerialData();
     // Movimiento con teclado
-    // Se cambiara para mover con giroscopio
+    // TODO: Cambiar para mover segun datos de giroscopio
     if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
     if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
     if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
@@ -57,12 +59,13 @@ class GameController extends Thread {
       if( collision(ball.getX(), ball.getY(), flag.x, flag.y) )
         flags.remove(i);
     }
+    */    
     
     return output;
   }
   
-  // Efecto de colision de prueba, más tarde será implementado
-  // con un bitmap
+  // Efecto de colision de prueba
+  // TODO: Cambiar a implementación con bitmap
   boolean collision(float x1, float y1, float x2, float y2) {
     float distance = dist(x1, y1, x2, y2);
     if(distance < (ball.getSize()/2) + 5) {
