@@ -10,7 +10,7 @@ class Ball {
   private float speedY;
   
   /** El coeficiente de fricción que se aplica a la velocidad de la pelota en cada fotograma. */
-  private final float friction = 0.95f;
+  private final float friction = 0.95;
   
   /** La velocidad máxima que la pelota puede alcanzar en cualquiera de los ejes. */
   private final float maxSpeed = 100;

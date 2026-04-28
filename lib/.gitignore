@@ -1,0 +1,4 @@
+StandardFirmata/
+
+!StandardFirmata/src/Firmata/*.cpp
+!StandardFirmata/src/Firmata/*.h
