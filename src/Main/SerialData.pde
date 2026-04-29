@@ -1,5 +1,6 @@
 class SerialData {
-  public int gameStart;
+  public int gameState; // 0: Sin empezar | 1: Juego digital | 2: Juego físico | 3: Perdida
+  public int button; 
   public int servo1;
   public int servo2;
   public int[] ledStrip;
@@ -11,7 +12,8 @@ class SerialData {
   public int gyroscope;
   
   public SerialData() {
-    this.gameStart = 0;
+    this.gameState= 0;
+    this.button = 0;
     this.servo1 = 0;
     this.servo2 = 0;
     this.ledStrip = new int[Config.NUM_LEDS];
@@ -26,7 +28,9 @@ class SerialData {
   @Override
   public String toString() {
     return "SerialData{" +
-            "servo1=" + servo1 +
+            "gameSate=" + gameState +
+            ", button=" + button +
+            ", servo1=" + servo1 +
             ", servo2=" + servo2 +
             ", ledStrip=" + java.util.Arrays.toString(ledStrip) +
             ", vibrationCoin=" + vibrationCoin +

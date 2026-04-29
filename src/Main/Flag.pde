@@ -14,7 +14,8 @@ class Flag {
   }
   
   void draw() {
-    fill(flagColor);
+    if(this.isTarget()) fill(color(128, 0, 128));
+    else fill(flagColor);
     circle(this.x, this.y, 10);  
   }
   
