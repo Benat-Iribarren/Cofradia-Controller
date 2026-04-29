@@ -1,6 +1,6 @@
 class Flag {
-  public final int x;
-  public final int y;
+  public final float x;
+  public final float y;
   private final int flagColor;
   private final float size;
   private boolean targetState;
@@ -19,8 +19,9 @@ class Flag {
     circle(this.x, this.y, 10);  
   }
   
-  public void makeTarget() {
+  public Flag makeTarget() {
     this.targetState = true;
+    return this;
   }
   
   public boolean isTarget() {

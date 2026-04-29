@@ -53,18 +53,24 @@ class GameController {
       for(int i=0; i<flagNum; i++) {
         flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3], 15) );
       }
-      flags.get(int(random(0, flagNum))).makeTarget();
+      flags.get(int(random(0, flags.size()-1))).makeTarget();
       output.gameState = 1;
       print("GAME STARTED\n");
     }
     
     if(input.gameState == 1) {
+      Flag target = null;
+      for(Flag flag : flags) if(flag.isTarget()) target = flag;
+      
       /** Movimiento con teclado
           TODO: Cambiar para mover segun datos de giroscopio */
       if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
       if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
       if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
       if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
+      
+      float distance = dist(ball.getX(), ball.getY(), target.x, target.y);
+      output.vibrationCoin = int(map(distance, 0, width, 1023, 0));
       
       for(int i=flags.size()-1; i>=0; i--) {
         Flag flag = flags.get(i);
