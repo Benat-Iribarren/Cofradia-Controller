@@ -7,12 +7,14 @@ void setup() {
 }
 
 void draw() {
-  SerialData inputData = arduino.read();
-  System.out.println("Input: " + inputData);
+  //SerialData inputData = arduino.read();
+  SerialData inputData = new SerialData();
+  System.out.println("Input: " + inputData.toString());
   
+  game.checkStart(inputData);
   SerialData outputData = game.update(inputData);
-  System.out.println("Output: " + outputData);
+  System.out.println("Output: " + outputData.toString());
   
-  arduino.write(outputData);
+  //arduino.write(outputData);
   game.render();
 }

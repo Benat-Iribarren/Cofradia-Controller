@@ -20,10 +20,14 @@ int[] colorScheme = COLOR_SCHEME_3;
 Board board;
 Ball ball;
 ArrayList<Flag> flags;
-int flagNum = 4;
 
-class GameController extends Thread {
+class GameController {
+  private int gameState; // 0: Sin empezar | 1: En curso | 2: Ganada | 3: Perdida
+  private int livesLeft;
+  
   public GameController() {
+    this.gameState = 0;
+    this.livesLeft = 3;
     setup();
   }
   
@@ -37,38 +41,74 @@ class GameController extends Thread {
       board = new Board(width, height, boardColor);
       ball = new Ball(width/2, height/2, width/25, ballColor);
       flags = new ArrayList<>();
-      for(int i=0; i<flagNum; i++) {
-        flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3]) );
-      }
+  }
+  
+  void checkStart(SerialData input) {
+    if(input.gameStart == 1) this.gameState = 1;;
   }
   
   SerialData update(SerialData input) {
-    SerialData output = new SerialData();
+    SerialData output = input;
+    /** La partida no cambia de estado
+        hasta que no se pulse comenzar */
     
-    /** LOGICA DEL JUEGO 
-    SerialData output = new SerialData();
-    // Movimiento con teclado
-    // TODO: Cambiar para mover segun datos de giroscopio
-    if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
-    if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
-    if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
-    if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
-    
-    for(int i=flags.size()-1; i>=0; i--) {
-      Flag flag = flags.get(i);
-      if( collision(ball.getX(), ball.getY(), flag.x, flag.y) )
-        flags.remove(i);
+    /** El numero de flags viene definido por
+        el valor del potenciometro (dificultad) */
+    //int flagNum = input.potentiometer%6;
+    if(this.gameState == 0) {
+      if(flags.size() > Config.MAX_FLAGS) {
+        int flagNum = int(random(1, 6));
+        for(int i=0; i<flagNum; i++) {
+          flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3], 15) );
+        }
+        flags.get(int(random(0, flagNum))).makeTarget();
+      }
     }
-    */    
     
+    if(this.gameState == 1) {
+      output = new SerialData();
+      
+      /** LOGICA DEL JUEGO 
+     
+          Movimiento con teclado
+          TODO: Cambiar para mover segun datos de giroscopio */
+      if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
+      if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
+      if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
+      if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
+      
+      for(int i=flags.size()-1; i>=0; i--) {
+        Flag flag = flags.get(i);
+        if( collision(ball.getX(), ball.getY(), ball.getSize()/2, flag) ) {
+          if(!flag.isTarget()) {
+            livesLeft--;
+            if(livesLeft == 0) {
+              this.gameState = 3;
+            }
+          } else {
+            flags.remove(i);
+            flags.get(int(random(0, flags.size()-1))).makeTarget();
+          }
+        }
+      }
+    }
+    
+    if(this.gameState == 2) {
+    
+    }
+    
+    if(this.gameState == 3) {
+    
+    }
+
     return output;
   }
   
   // Efecto de colision de prueba
   // TODO: Cambiar a implementación con bitmap
-  boolean collision(float x1, float y1, float x2, float y2) {
-    float distance = dist(x1, y1, x2, y2);
-    if(distance < (ball.getSize()/2) + 5) {
+  boolean collision(float x1, float y1, float rad1, Flag flag) {
+    float distance = dist(x1, y1, flag.x, flag.y);
+    if(distance < rad1 + flag.getSize()/2) {
       return true;
     }
     return false;
@@ -80,5 +120,30 @@ class GameController extends Thread {
     for(Flag flag : flags) {
       flag.draw();
     }
+    for(int i=0; i<livesLeft; i++) {
+      drawHeart(40*(i+1), 30, 1, colorScheme[2]);
+    }
+  }
+  
+  void changeGameState() {
+    this.gameState = (this.gameState + 1)%3;
+  }
+  
+  void drawHeart(float centerX, float centerY, float radius, int c) {
+    fill(c);
+    beginShape();
+    
+    // Iterate through the angle 't' from 0 to 2*PI
+    for (float t = 0; t <= TWO_PI; t += 0.05) {
+      
+      // Calculate the base x and y coordinates
+      float x = 16 * pow(sin(t), 3);
+      float y = -(13 * cos(t) - 5 * cos(2*t) - 2 * cos(3*t) - cos(4*t));
+      
+      // Scale by the radius and translate to the center point
+      vertex(centerX + (x * radius), centerY + (y * radius));
+    }
+    
+    endShape(CLOSE);
   }
 }
