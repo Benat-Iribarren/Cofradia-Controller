@@ -20,10 +20,12 @@ int[] colorScheme = COLOR_SCHEME_3;
 Board board;
 Ball ball;
 ArrayList<Flag> flags;
-int flagNum = 4;
 
-class GameController extends Thread {
+class GameController {
+  private int livesLeft;
+  
   public GameController() {
+    this.livesLeft = 3;
     setup();
   }
   
@@ -37,38 +39,66 @@ class GameController extends Thread {
       board = new Board(width, height, boardColor);
       ball = new Ball(width/2, height/2, width/25, ballColor);
       flags = new ArrayList<>();
-      for(int i=0; i<flagNum; i++) {
-        flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3]) );
-      }
   }
   
   SerialData update(SerialData input) {
-    SerialData output = new SerialData();
-    
-    /** LOGICA DEL JUEGO 
-    SerialData output = new SerialData();
-    // Movimiento con teclado
-    // TODO: Cambiar para mover segun datos de giroscopio
-    if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
-    if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
-    if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
-    if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
-    
-    for(int i=flags.size()-1; i>=0; i--) {
-      Flag flag = flags.get(i);
-      if( collision(ball.getX(), ball.getY(), flag.x, flag.y) )
-        flags.remove(i);
+    SerialData output = input;
+    if(input.gameState == 0 && input.button == 1) {
+      
+      /** TODO: El numero de flags viene definido por
+          el valor del potenciometro (dificultad) */
+      //int flagNum = input.potentiometer%6;
+      int flagNum = int(random(3, 6));
+      
+      for(int i=0; i<flagNum; i++) {
+        flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3], 15) );
+      }
+      flags.get(int(random(0, flagNum))).makeTarget();
+      output.gameState = 1;
+      print("GAME STARTED\n");
     }
-    */    
     
+    if(input.gameState == 1) {
+      /** Movimiento con teclado
+          TODO: Cambiar para mover segun datos de giroscopio */
+      if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
+      if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
+      if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
+      if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
+      
+      for(int i=flags.size()-1; i>=0; i--) {
+        Flag flag = flags.get(i);
+        if( collision(ball.getX(), ball.getY(), ball.getSize()/2, flag) ) {
+          if(!flag.isTarget()) {
+            livesLeft--;
+            if(livesLeft == 0) {
+              input.gameState = 3;
+            }
+          } else {
+            flags.remove(i);
+            if(flags.isEmpty() && livesLeft > 0) input.gameState = 2;
+            else flags.get(int(random(0, flags.size()-1))).makeTarget();
+          }
+        }
+      }
+    }
+    
+    if(input.gameState == 2) {
+      openVictoryWindow();
+    }
+    
+    if(input.gameState == 3) {
+      openDefeatWindow();
+    }
+
     return output;
   }
   
   // Efecto de colision de prueba
   // TODO: Cambiar a implementación con bitmap
-  boolean collision(float x1, float y1, float x2, float y2) {
-    float distance = dist(x1, y1, x2, y2);
-    if(distance < (ball.getSize()/2) + 5) {
+  boolean collision(float x1, float y1, float rad1, Flag flag) {
+    float distance = dist(x1, y1, flag.x, flag.y);
+    if(distance < rad1 + flag.getSize()/2) {
       return true;
     }
     return false;
@@ -80,5 +110,47 @@ class GameController extends Thread {
     for(Flag flag : flags) {
       flag.draw();
     }
+    for(int i=0; i<livesLeft; i++) {
+      drawHeart(40*(i+1), 30, 1, colorScheme[2]);
+    }
+  }
+  
+  void drawHeart(float centerX, float centerY, float radius, int c) {
+    fill(c);
+    beginShape();
+    for (float t = 0; t <= TWO_PI; t += 0.05) {
+      
+      float x = 16 * pow(sin(t), 3);
+      float y = -(13 * cos(t) - 5 * cos(2*t) - 2 * cos(3*t) - cos(4*t));
+      
+      vertex(centerX + (x * radius), centerY + (y * radius));
+    }
+    endShape(CLOSE);
+  }
+  
+  void openVictoryWindow() {
+    fill(colorScheme[2]);
+    rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+    fill(0, 0, 0);
+    textSize(50);
+    text("Todas las banderas recogidas", width/2 - 125, height/2 - 25);
+    
+    fill(255); // White text for button
+    textSize(16);
+    text("Ahora completa el tablero", width/2 - 50, height/2 + 50);
+  }
+  
+  void openDefeatWindow() {
+    fill(colorScheme[2]);
+    rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+    fill(0, 0, 0);
+    textSize(50);
+    text("Game Over", width/2 - 125, height/2 - 25);
+    fill(colorScheme[0]);
+    rect(width/2 - 75, height/2 + 25, 120, 40, 5);
+    
+    fill(255);
+    textSize(16);
+    text("Reintentar", width/2 - 50, height/2 + 50);
   }
 }
