@@ -3,16 +3,19 @@ int[] COLOR_SCHEME_1 = {
   color(255, 182, 193),   // Rosa Pastel
   color(152, 255, 152)    // Verde Menta
 };
+
 int[] COLOR_SCHEME_2 = {
-    color(20, 0, 50),      // Morado Medianoche
-    color(0, 255, 255),    // Cyan Neon
-    color(255, 0, 255)     // Magenta Neon
+  color(20, 0, 50),       // Morado Medianoche
+  color(0, 255, 255),     // Cyan Neon
+  color(255, 0, 255)      // Magenta Neon
 };
+
 int[] COLOR_SCHEME_3 = {
   color(34, 139, 34),     // Verde Bosque
   color(238, 214, 175),   // Arena
   color(204, 85, 0)       // Terracota
 };
+
 int[] FLAG_COLORS;
 
 int[] colorScheme = COLOR_SCHEME_3;
@@ -20,39 +23,52 @@ int[] colorScheme = COLOR_SCHEME_3;
 Board board;
 Ball ball;
 ArrayList<Flag> flags;
+
 int flagNum = 4;
+int sensorValue = 0;
+
+Difficulty difficultyBuilder;
+Difficulty difficulty;
 
 void setup() {
-    fullScreen();
-    FLAG_COLORS = new int[]{color(0, 255, 0), color(255, 204, 0), color(255, 0, 0)};
-    
-    //BOARD AND BALL INITIALIZATION
-    int boardColor = colorScheme[0];
-    int ballColor = colorScheme[1];
-    board = new Board(width, height, boardColor);
-    ball = new Ball(width/2, height/2, width/25, ballColor);
-    
-    //FLAG SETUP
-    flags = new ArrayList<>();
-    for(int i=0; i<flagNum; i++) {
-      flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3]) );
-    }
+  fullScreen();
+
+  FLAG_COLORS = new int[]{color(0, 255, 0), color(255, 204, 0), color(255, 0, 0)};
+
+  difficultyBuilder = new Difficulty(1, 1, 1, new int[0]);
+  difficulty = difficultyBuilder.fromSensorValue(sensorValue, flagNum);
+
+  //BOARD AND BALL INITIALIZATION
+  int boardColor = colorScheme[0];
+  int ballColor = colorScheme[1];
+  board = new Board(width, height, boardColor);
+  ball = new Ball(width/2, height/2, width/25, ballColor);
+
+  //FLAG SETUP
+  flags = new ArrayList<>();
+
+  for(int i=0; i<difficulty.getFlagIndexes().length; i++) {
+    int flagIndex = difficulty.getFlagIndexes()[i];
+    flags.add(new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[flagIndex % 3]));
+  }
 }
 
 void draw() {
   board.draw();
-  if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
-  if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
-  if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
-  if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
+
+  if(keyPressed && keyCode == UP) ball.accelerate(0, -difficulty.getSpeedMultiplier());
+  if(keyPressed && keyCode == DOWN) ball.accelerate(0, difficulty.getSpeedMultiplier());
+  if(keyPressed && keyCode == LEFT) ball.accelerate(-difficulty.getSpeedMultiplier(), 0);
+  if(keyPressed && keyCode == RIGHT) ball.accelerate(difficulty.getSpeedMultiplier(), 0);
+
   ball.update();
-  
+
   for(int i=flags.size()-1; i>=0; i--) {
     Flag flag = flags.get(i);
-    if( collision(ball.getX(), ball.getY(), flag.x, flag.y) )
+    if(collision(ball.getX(), ball.getY(), flag.x, flag.y))
       flags.remove(i);
   }
-  
+
   for(Flag flag : flags) {
     flag.draw();
   }
