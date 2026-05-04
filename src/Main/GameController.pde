@@ -1,3 +1,5 @@
+import java.util.concurrent.CopyOnWriteArrayList;
+
 int[] COLOR_SCHEME_1 = {
   color(137, 207, 240),   // Azul pastel
   color(255, 182, 193),   // Rosa Pastel
@@ -28,6 +30,7 @@ class GameController {
   
   private Difficulty difficultyBuilder;
   private Difficulty difficulty;
+  private GyroscopePointingMethod gyroscopePointingMethod;
   
   public GameController() {
     this.livesLeft = 3;
@@ -40,23 +43,32 @@ class GameController {
     flags = new CopyOnWriteArrayList<Flag>();
     this.difficultyBuilder = new Difficulty(1, 1, 1, new int[0]);
     this.difficulty = new Difficulty(1, 1, 1, new int[]{0});
-    setup();
+    this.gyroscopePointingMethod = new GyroscopePointingMethod();
   }
 
   SerialData update(SerialData input) {
     // --- STATE 0: START MENU ---
     if(input.gameState == 0 && input.button == 1) {
       
-      int flagNum = int(random(3, 6)); // Will use potentiometer later
+      difficulty = difficultyBuilder.fromSensorValue(input.potentiometer, 4);
+      int flagNum = difficulty.getFlagIndexes().length;
       
       for(int i = 0; i < flagNum; i++) {
-        flags.add( new Flag(int(random(0, width)), int(random(0, height)), FLAG_COLORS[i%3], 15) );
+        int flagIndex = difficulty.getFlagIndexes()[i];
+
+        flags.add(new Flag(
+          int(random(0, width)),
+          int(random(0, height)),
+          FLAG_COLORS[flagIndex % 3],
+          15
+        ));
       }
       
       flags.get(int(random(flags.size()))).makeTarget(); 
       
       input.gameState = 1;
       println("GAME STARTED");
+      println("Difficulty level: " + difficulty.getLevel());
     }
     
     // --- STATE 1: GAMEPLAY ---
@@ -73,11 +85,14 @@ class GameController {
         input.vibrationCoin = int(map(distance, 0, width, 1023, 0));
       }
       
-      // Keyboard simulation (To be replaced by Gyro)
-      if(keyPressed && keyCode == UP) ball.accelerate(0, -1);
-      if(keyPressed && keyCode == DOWN) ball.accelerate(0, 1);
-      if(keyPressed && keyCode == LEFT) ball.accelerate(-1, 0);
-      if(keyPressed && keyCode == RIGHT) ball.accelerate(1, 0);
+      // Keyboard simulation
+      if(keyPressed && keyCode == UP) ball.accelerate(0, -difficulty.getSpeedMultiplier());
+      if(keyPressed && keyCode == DOWN) ball.accelerate(0, difficulty.getSpeedMultiplier());
+      if(keyPressed && keyCode == LEFT) ball.accelerate(-difficulty.getSpeedMultiplier(), 0);
+      if(keyPressed && keyCode == RIGHT) ball.accelerate(difficulty.getSpeedMultiplier(), 0);
+
+      // Gyroscope movement
+      gyroscopePointingMethod.move(ball, input, difficulty);
       
       // Collision Loop
       for(int i = flags.size()-1; i >= 0; i--) {
@@ -126,6 +141,7 @@ class GameController {
     for(Flag flag : flags) {
       flag.draw();
     }
+
     for(int i = 0; i < livesLeft; i++) {
       drawHeart(40*(i+1), 30, 1, colorScheme[2]); 
     }

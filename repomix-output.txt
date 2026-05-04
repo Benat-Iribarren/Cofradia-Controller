@@ -1,0 +1,1016 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+lib/
+  SerialCommunication/
+    SerialCommunication.ino
+  .gitignore
+src/
+  Main/
+    code/
+      arduino.jar
+    ArduinoController.pde
+    Ball.pde
+    Board.pde
+    BoardController.pde
+    Config.pde
+    Difficulty.pde
+    Flag.pde
+    GameController.pde
+    GyroscopePointingMethod.pde
+    Main.pde
+    SerialData.pde
+    sketch.properties
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/Main/GyroscopePointingMethod.pde">
+class GyroscopePointingMethod {
+  private final float deadZone;
+  private final float maxTilt;
+
+  private boolean calibrated;
+  private float centerX;
+  private float centerY;
+
+  public GyroscopePointingMethod() {
+    this.deadZone = 0.12;
+    this.maxTilt = 350;
+    this.calibrated = false;
+    this.centerX = 512;
+    this.centerY = 512;
+  }
+
+  public void move(Ball ball, SerialData input, Difficulty difficulty) {
+    if(!calibrated && input.gyroX != 0 && input.gyroY != 0) {
+      centerX = input.gyroX;
+      centerY = input.gyroY;
+      calibrated = true;
+
+      println("Gyro calibrated -> X: " + centerX + " Y: " + centerY);
+    }
+
+    float movementX = (input.gyroX - centerX) / maxTilt;
+    float movementY = (input.gyroY - centerY) / maxTilt;
+
+    movementX = constrain(movementX, -1, 1);
+    movementY = constrain(movementY, -1, 1);
+
+    if(abs(movementX) > deadZone) {
+      ball.accelerate(movementX * difficulty.getSpeedMultiplier(), 0);
+    }
+
+    if(abs(movementY) > deadZone) {
+      ball.accelerate(0, movementY * difficulty.getSpeedMultiplier());
+    }
+  }
+}
+</file>
+
+<file path="lib/SerialCommunication/SerialCommunication.ino">
+#include <Wire.h>
+#include <Adafruit_NeoPixel.h>
+#include <Servo.h> // Bring the standard servo library back!
+
+// --- Pin Definitions ---
+#define NEOPIXEL_PIN 2
+#define NUMPIXELS 9
+#define VIBRATION_PIN 6
+#define SERVO1_PIN 3
+#define SERVO2_PIN 5
+#define LDR1_PIN A0
+#define LDR2_PIN A1
+#define LDR3_PIN A2
+#define POT_PIN A3
+
+// MPU6050 I2C PINS
+// SDA -> A4
+// SCL -> A5
+#define MPU_ADDR 0x68
+
+// --- Objects ---
+Adafruit_NeoPixel pixels(NUMPIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+Servo servo1, servo2;
+
+// We expect 1 byte for the LED, 1 byte for the Servo, and 3 bytes per NeoPixel
+int expectedBytes = 3 + (NUMPIXELS * 3); 
+
+void setup() {
+  Serial.begin(115200); 
+  
+  // Setup Basic Hardware
+  //pinMode(BASIC_LED_PIN, OUTPUT);
+  servo1.attach(SERVO1_PIN);
+  servo2.attach(SERVO2_PIN);
+  
+  // Setup NeoPixels
+  pixels.begin();
+  pixels.clear();
+  pixels.show();
+
+  // Setup MPU6050
+  Wire.begin();
+
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B);      // Power management register
+  Wire.write(0);         // Wake up MPU6050
+  Wire.endTransmission(true);
+  
+  // Say hello to Processing to start the loop
+  Serial.println("READY"); 
+}
+
+void loop() {
+  // Wait until Processing sends the full packet of instructions
+  if (Serial.available() >= expectedBytes) {
+
+    int vibrationSpeed = Serial.read();
+    int servo1Angle = Serial.read();
+    int servo2Angle = Serial.read();
+
+    analogWrite(VIBRATION_PIN, vibrationSpeed);
+    servo1.write(servo1Angle);
+    servo2.write(servo2Angle);
+    
+    // 3. EXECUTE NEOPIXELS
+    for (int i = 0; i < NUMPIXELS; i++) {
+      int r = Serial.read();
+      int g = Serial.read();
+      int b = Serial.read();
+      pixels.setPixelColor(i, pixels.Color(r, g, b));
+    }
+    pixels.show(); 
+  }
+
+  // 4. READ MPU6050
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);      // Start accelerometer registers
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU_ADDR, 6, true);
+
+  int16_t accX = Wire.read() << 8 | Wire.read();
+  int16_t accY = Wire.read() << 8 | Wire.read();
+  int16_t accZ = Wire.read() << 8 | Wire.read();
+
+  int gyroXValue = map(accX, -17000, 17000, 0, 1023);
+  int gyroYValue = map(accY, -17000, 17000, 0, 1023);
+  int gyroZValue = map(accZ, -17000, 17000, 0, 1023);
+
+  gyroXValue = constrain(gyroXValue, 0, 1023);
+  gyroYValue = constrain(gyroYValue, 0, 1023);
+  gyroZValue = constrain(gyroZValue, 0, 1023);
+
+  // 5. READ OTHER SENSORS
+  int ldr1Value = analogRead(LDR1_PIN);
+  int ldr2Value = analogRead(LDR2_PIN);
+  int ldr3Value = analogRead(LDR3_PIN);
+  int potValue  = analogRead(POT_PIN);
+  
+  // 6. SEND ALL SENSOR DATA BACK TO PROCESSING
+  // Format: gyroX,gyroY,gyroZ,ldr1,ldr2,ldr3,pot
+  Serial.print(gyroXValue);
+  Serial.print(",");
+  Serial.print(gyroYValue);
+  Serial.print(",");
+  Serial.print(gyroZValue); 
+  Serial.print(",");
+  Serial.print(ldr1Value);
+  Serial.print(",");
+  Serial.print(ldr2Value);
+  Serial.print(",");
+  Serial.print(ldr3Value);
+  Serial.print(",");
+  Serial.println(potValue);
+
+  delay(50);
+}
+</file>
+
+<file path="lib/.gitignore">
+StandardFirmata/
+
+!StandardFirmata/src/Firmata/*.cpp
+!StandardFirmata/src/Firmata/*.h
+</file>
+
+<file path="src/Main/Ball.pde">
+/**
+ * Representa una pelota con física 2D básica, incluyendo velocidad, aceleración y fricción.
+ * La pelota gestiona su propio movimiento, las restricciones de los límites de la pantalla y su renderizado.
+ */
+class Ball {
+  private float x;
+  private float y;
+  private final float size;
+  private float speedX;
+  private float speedY;
+  
+  /** El coeficiente de fricción que se aplica a la velocidad de la pelota en cada fotograma. */
+  private final float friction = 0.95;
+  
+  /** La velocidad máxima que la pelota puede alcanzar en cualquiera de los ejes. */
+  private final float maxSpeed = 100;
+  
+  /** El color de la pelota, almacenado como un número entero (formato de color de Processing). */
+  private final int ballColor;
+  
+  /**
+   * Construye un nuevo objeto Ball.
+   * * @param initialX  La coordenada x inicial de la pelota.
+   * @param initialY  La coordenada y inicial de la pelota.
+   * @param size      El diámetro de la pelota.
+   * @param ballColor El color de la pelota.
+   */
+  public Ball(float initialX, float initialY, float size, int ballColor) {
+    this.x = initialX;
+    this.y = initialY;
+    this.size = size;
+    this.speedX = 0;
+    this.speedY = 0;
+    this.ballColor = ballColor;
+  }
+  
+  /**
+   * Dibuja la pelota en la pantalla utilizando su posición, tamaño y color actuales.
+   */
+  public void draw() {
+    fill(this.ballColor);
+    circle(this.x, this.y, this.size);
+  }
+  
+  /**
+   * Incrementa la velocidad actual de la pelota sumando las cantidades de aceleración dadas.
+   * * @param accelerationX La cantidad de aceleración a aplicar en el eje x.
+   * @param accelerationY La cantidad de aceleración a aplicar en el eje y.
+   */
+  public void accelerate(float accelerationX, float accelerationY) {
+    this.speedX += accelerationX;
+    this.speedY += accelerationY;
+  }
+  
+  /**
+   * Actualiza el estado físico de la pelota. Este método aplica los límites de velocidad, 
+   * calcula la fricción, actualiza la posición actual basándose en la velocidad, 
+   * restringe la pelota para que no salga de los límites y la vuelve a dibujar.
+   */
+  public void update() {
+    this.speedX = constrain(this.speedX, -maxSpeed, maxSpeed);
+    this.speedY = constrain(this.speedY, -maxSpeed, maxSpeed);
+    
+    this.speedX *= friction;
+    this.speedY *= friction;
+    
+    this.x += this.speedX;
+    this.x = constrain(this.x, (size/2), width - (size/2));
+    
+    this.y += this.speedY;
+    this.y = constrain(this.y, (size/2), height - (size/2));
+    
+    draw();
+  }
+  
+  /**
+   * Obtiene la coordenada x actual de la pelota.
+   * * @return La coordenada x.
+   */
+  public float getX() {
+    return this.x;
+  }
+  
+  /**
+   * Obtiene la coordenada y actual de la pelota.
+   * * @return La coordenada y.
+   */
+  public float getY() {
+    return this.y;
+  }
+  
+    /**
+   * Obtiene el diametro de la pelota.
+   * * @return El diametro.
+   */
+   public float getSize() {
+     return this.size;
+   }
+}
+</file>
+
+<file path="src/Main/Board.pde">
+/**
+ * Representa el tablero o fondo del juego.
+ * Esta clase almacena las dimensiones y el color del área de juego, 
+ * y se encarga de dibujarse a sí misma en la pantalla.
+ */
+class Board {
+  
+  /** El ancho del tablero en píxeles. */
+  private final int pixelsWidth;
+  
+  /** La altura del tablero en píxeles. */
+  private final int pixelsHeight;
+  
+  /** El color del tablero, almacenado como un número entero (formato de color de Processing). */
+  private final int boardColor;
+  
+  /**
+   * Construye un nuevo objeto Board.
+   * * @param pixelsWidth  El ancho total del tablero.
+   * @param pixelsHeight La altura total del tablero.
+   * @param boardColor   El color de fondo del tablero.
+   */
+  public Board(int pixelsWidth, int pixelsHeight, int boardColor) {
+    this.pixelsWidth = pixelsWidth;
+    this.pixelsHeight = pixelsHeight;
+    this.boardColor = boardColor;
+  }
+  
+  /**
+   * Dibuja el tablero en la pantalla.
+   * Rellena el área con el color especificado y dibuja un rectángulo 
+   * que comienza desde la esquina superior izquierda (0, 0) cubriendo 
+   * el ancho y alto definidos.
+   */
+  public void draw() {
+    fill(this.boardColor);
+    rect(0, 0, this.pixelsWidth, this.pixelsHeight);
+  }
+}
+</file>
+
+<file path="src/Main/Difficulty.pde">
+/**
+ * Representa la dificultad del juego.
+ * La dificultad define el nivel, la velocidad de movimiento,
+ * el número de repeticiones y las banderas que deben seleccionarse.
+ */
+class Difficulty {
+  private final int level;
+  private final int speedMultiplier;
+  private final int repetitions;
+  private final int[] flagIndexes;
+
+  /**
+   * Construye un nuevo objeto Difficulty.
+   *
+   * @param level           El nivel de dificultad.
+   * @param speedMultiplier El multiplicador de velocidad.
+   * @param repetitions     El número de repeticiones.
+   * @param flagIndexes     Los índices de las banderas seleccionadas.
+   */
+  public Difficulty(int level, int speedMultiplier, int repetitions, int[] flagIndexes) {
+    this.level = level;
+    this.speedMultiplier = speedMultiplier;
+    this.repetitions = repetitions;
+    this.flagIndexes = flagIndexes;
+  }
+
+  /**
+   * Construye una dificultad a partir del valor recibido por el sensor.
+   *
+   * @param value      Valor del sensor entre 0 y 1023.
+   * @param totalFlags Número total de banderas disponibles.
+   * @return La dificultad calculada.
+   */
+  public Difficulty fromSensorValue(int value, int totalFlags) {
+    int calculatedLevel = constrain(floor(map(value, 0, 1024, 1, 5)), 1, 4);
+
+    return new Difficulty(
+      calculatedLevel,
+      calculatedLevel,
+      calculatedLevel,
+      buildFlagIndexes(totalFlags, calculatedLevel)
+    );
+  }
+
+  /**
+   * Construye un array con los índices de las banderas seleccionadas.
+   *
+   * @param totalFlags Número total de banderas disponibles.
+   * @param amount     Número de banderas a seleccionar.
+   * @return Array con los índices de las banderas.
+   */
+  private int[] buildFlagIndexes(int totalFlags, int amount) {
+    int size = min(totalFlags, amount);
+    int[] indexes = new int[size];
+
+    for (int i = 0; i < size; i++) {
+      indexes[i] = i;
+    }
+
+    return indexes;
+  }
+
+  /**
+   * Obtiene el nivel de dificultad.
+   *
+   * @return El nivel de dificultad.
+   */
+  public int getLevel() {
+    return this.level;
+  }
+
+  /**
+   * Obtiene el multiplicador de velocidad.
+   *
+   * @return El multiplicador de velocidad.
+   */
+  public int getSpeedMultiplier() {
+    return this.speedMultiplier;
+  }
+
+  /**
+   * Obtiene el número de repeticiones.
+   *
+   * @return El número de repeticiones.
+   */
+  public int getRepetitions() {
+    return this.repetitions;
+  }
+
+  /**
+   * Obtiene los índices de las banderas seleccionadas.
+   *
+   * @return Los índices de las banderas seleccionadas.
+   */
+  public int[] getFlagIndexes() {
+    return this.flagIndexes;
+  }
+}
+</file>
+
+<file path="src/Main/sketch.properties">
+main=Main.pde
+</file>
+
+<file path="README.md">
+
+</file>
+
+<file path="src/Main/BoardController.pde">
+class BoardController {
+  int flag1CheckCounter;
+  int flag2CheckCounter;
+  int flag3CheckCounter;
+  boolean wasLdr1Dark = false;
+  boolean wasLdr2Dark = false;
+  boolean wasLdr3Dark = false;
+  
+  int lastTriggerTime1 = 0;
+  int lastTriggerTime2 = 0;
+  int lastTriggerTime3 = 0;
+  int cooldownMillis = 500; 
+  
+  public BoardController() {
+    this.flag1CheckCounter = 0;
+    this.flag2CheckCounter = 0;
+  }
+  
+  SerialData update(SerialData input) {
+    SerialData output = input;
+    
+    /** SERVO */
+    
+    
+    
+    /** LDR */
+    
+    boolean isLdr1Dark = input.ldr1 < 100;
+    
+    if (isLdr1Dark && !wasLdr1Dark && (millis() - lastTriggerTime1 > cooldownMillis)) {
+      
+      if (flag1CheckCounter < 2) {
+        output.ledStrip[flag1CheckCounter] = 1;
+        flag1CheckCounter++;
+        
+        lastTriggerTime1 = millis(); 
+      }
+    }
+    
+    wasLdr1Dark = isLdr1Dark; 
+    
+    boolean isLdr2Dark = input.ldr2 < 100;
+    
+    if (isLdr2Dark && !wasLdr2Dark && (millis() - lastTriggerTime2 > cooldownMillis)) {
+      
+      if (flag2CheckCounter < 2) {
+        output.ledStrip[2 + flag2CheckCounter] = 1;
+        flag2CheckCounter++;
+        
+        lastTriggerTime2 = millis();
+      }
+    }
+    
+    wasLdr2Dark = isLdr2Dark;
+    
+    boolean isLdr3Dark = input.ldr3 < 100;
+    
+    if (isLdr3Dark && !wasLdr3Dark && (millis() - lastTriggerTime3 > cooldownMillis)) {
+      
+      if (flag3CheckCounter < 2) {
+        output.ledStrip[4 + flag3CheckCounter] = 1;
+        flag3CheckCounter++;
+        
+        lastTriggerTime3 = millis();
+      }
+    }
+    
+    wasLdr3Dark = isLdr3Dark;
+  
+    return output;
+  }
+}
+</file>
+
+<file path="src/Main/Config.pde">
+class Config {
+  // DIGITAL PINS
+  public static final int LEDSTRIP_PIN = 2;
+  public static final int SERVO1_PIN = 3; // PMW
+  public static final int SERVO2_PIN = 5; // PMW
+  public static final int VC_PIN = 6; // PMW
+  
+  // ANALOG PINS
+  public static final int LDR1_PIN = 0;
+  public static final int LDR2_PIN = 1;
+  public static final int LDR3_PIN = 2;
+  public static final int POT_PIN = 3;
+  public static final int GYRO_PIN = 4;
+  
+  // EXTRAS
+  public static final int NUM_LEDS = 9;
+  public static final int MAX_FLAGS = 6;
+}
+</file>
+
+<file path="src/Main/ArduinoController.pde">
+import processing.serial.*;
+import cc.arduino.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+class ArduinoController {
+  int gyroX, gyroY, gyroZ;
+  int ldr1, ldr2, ldr3;
+  int pot;
+  
+  Serial serialPort;
+  
+  public ArduinoController(PApplet parent, int portIndex) {
+    serialPort = new Serial(parent, Serial.list()[portIndex], 115200);
+    serialPort.bufferUntil('\n');
+  }
+  
+  SerialData read(SerialData previous) {
+    SerialData in = previous;
+    in.gyroX = this.gyroX;
+    in.gyroY = this.gyroY;
+    in.gyroZ = this.gyroZ;
+    
+    in.ldr1 = this.ldr1;
+    in.ldr2 = this.ldr2;
+    in.ldr3 = this.ldr3;
+    
+    in.potentiometer = this.pot; 
+    
+    return in;
+  }
+  
+  void write(SerialData out) {
+    byte[] packet = new byte[3 + (Config.NUM_LEDS * 3)];
+    
+    // Pack the individual actuators first
+    packet[0] = (byte) out.vibrationCoin;
+    packet[1] = (byte) out.servo1;
+    packet[2] = (byte) out.servo2;
+    
+    // Pack the LED array
+    for (int i = 0; i < Config.NUM_LEDS; i++) {
+      int offset = 3 + (i * 3); 
+      packet[offset]     = (byte) red(out.ledStrip[i]);
+      packet[offset + 1] = (byte) green(out.ledStrip[i]);
+      packet[offset + 2] = (byte) blue(out.ledStrip[i]);
+    }
+    
+    serialPort.write(packet);
+  }
+  
+  void parseData(String data) {
+    data = trim(data); 
+    
+    if (data.equals("READY")) {
+      return;
+    }
+    
+    String[] values = split(data, ',');
+    
+    if (values.length == 7) { 
+      try{
+        this.gyroX = int(values[0]);
+        this.gyroY = int(values[1]);
+        this.gyroZ = int(values[2]);
+        this.ldr1  = int(values[3]);
+        this.ldr2  = int(values[4]);
+        this.ldr3  = int(values[5]);
+        this.pot   = int(values[6]); 
+      } catch(Exception e) {
+        println("Corrupted serial data received, ignoring frame.");
+      }
+    } 
+  }
+}
+</file>
+
+<file path="src/Main/Flag.pde">
+class Flag {
+  public final float x;
+  public final float y;
+  private final int flagColor;
+  private final float size;
+  private boolean targetState;
+  
+  public Flag(int x, int y, int flagColor, int size) {
+    this.x = x;
+    this.y = y;
+    this.flagColor = flagColor;
+    this.size = size;
+    this.targetState = false;
+  }
+  
+  void draw() {
+    if(this.isTarget()) fill(color(128, 0, 128));
+    else fill(flagColor);
+    circle(this.x, this.y, 10);  
+  }
+  
+  public Flag makeTarget() {
+    this.targetState = true;
+    return this;
+  }
+  
+  public boolean isTarget() {
+    return this.targetState;
+  }
+  
+  public float getSize() {
+    return this.size; 
+  }
+}
+</file>
+
+<file path="src/Main/SerialData.pde">
+class SerialData {
+  public int gameState; // 0: Sin empezar | 1: Juego digital | 2: Juego físico | 3: Perdida
+  public int button; 
+  public int servo1, servo2;
+  public color[] ledStrip = new color[Config.NUM_LEDS];
+  public int vibrationCoin;
+  public int ldr1, ldr2, ldr3;
+  public int potentiometer;
+  public int gyroX, gyroY, gyroZ;
+  
+  public SerialData() {
+    this.gameState= 0;
+    this.button = 0;
+    this.servo1 = 0;
+    this.servo2 = 0;
+    for (int i = 0; i < Config.NUM_LEDS; i++) {
+      ledStrip[i] = color(0, 0, 0); // Start all LEDs off
+    }
+    this.vibrationCoin = 0;
+    this.ldr1 = 0;
+    this.ldr2 = 0;
+    this.ldr3 = 0;
+    this.potentiometer = 0;
+    this.gyroX = 0;
+    this.gyroY = 0;
+    this.gyroZ = 0;
+  }
+  
+  @Override
+  public String toString() {
+    return "SerialData{" +
+            "gameSate=" + gameState +
+            ", potentiometer=" + potentiometer +
+            ", button=" + button +
+            ", servo1=" + servo1 +
+            ", servo2=" + servo2 +
+            ", ledStrip=" + java.util.Arrays.toString(ledStrip) +
+            ", vibrationCoin=" + vibrationCoin +
+            ", ldr1=" + ldr1 +
+            ", ldr2=" + ldr2 +
+            ", ldr3=" + ldr3 +
+            ", gyroX=" + gyroX +
+            ", gyroY=" + gyroY +
+            ", gyroZ=" + gyroZ +
+            '}';
+  }
+}
+</file>
+
+<file path="src/Main/Main.pde">
+ArduinoController arduino;
+GameController game;
+BoardController control;
+SerialData inputData;
+SerialData outputData;
+SerialData previousState;
+
+int lastMessageTime = 0;
+boolean readyToSend = false;
+
+void setup() {
+  fullScreen();
+  
+  game = new GameController();
+  control = new BoardController(); 
+  inputData = new SerialData();
+  outputData = new SerialData();
+  previousState = new SerialData();
+  arduino = new ArduinoController(this, 0);
+}
+
+void draw() {
+  previousState = outputData;
+  
+  inputData = arduino.read(previousState);
+  print("Input: " + inputData.toString() + '\n');
+  
+  if(inputData.gameState <= 3) {
+    outputData = game.update(inputData); 
+    print("Output: " + outputData.toString() + '\n');
+    game.render(inputData.gameState);                       
+  } else {
+    outputData = control.update(inputData);
+  }
+  
+  if (readyToSend == true) {
+    arduino.write(outputData);
+    readyToSend = false; 
+    lastMessageTime = millis();
+  }
+
+  if (millis() - lastMessageTime > 500) {
+    println("Handshake dropped! Restarting communication...");
+    if (arduino != null && outputData != null) {
+      arduino.write(outputData); 
+    }
+    lastMessageTime = millis(); 
+  }
+}
+
+void serialEvent(Serial p) {
+  if (arduino == null || game == null || control == null) return;
+
+  String input = p.readStringUntil('\n');
+  
+  if (input != null) {
+    arduino.parseData(input);
+    readyToSend = true;
+  }
+}
+
+void keyPressed() {
+  if (key == ' ' && inputData.gameState == 0) {
+    inputData.button = 1; 
+  }
+}
+</file>
+
+<file path="src/Main/GameController.pde">
+int[] COLOR_SCHEME_1 = {
+  color(137, 207, 240),   // Azul pastel
+  color(255, 182, 193),   // Rosa Pastel
+  color(152, 255, 152)    // Verde Menta
+};
+
+int[] COLOR_SCHEME_2 = {
+  color(20, 0, 50),       // Morado Medianoche
+  color(0, 255, 255),     // Cyan Neon
+  color(255, 0, 255)      // Magenta Neon
+};
+
+int[] COLOR_SCHEME_3 = {
+  color(34, 139, 34),     // Verde Bosque
+  color(238, 214, 175),   // Arena
+  color(204, 85, 0)       // Terracota
+};
+
+class GameController {
+  
+  private Board board;
+  private Ball ball;
+  private CopyOnWriteArrayList<Flag> flags;
+  private int livesLeft;
+  
+  private int[] FLAG_COLORS;
+  private int[] colorScheme = COLOR_SCHEME_3;
+  
+  private Difficulty difficultyBuilder;
+  private Difficulty difficulty;
+  private GyroscopePointingMethod gyroscopePointingMethod;
+  
+  public GameController() {
+    this.livesLeft = 3;
+    FLAG_COLORS = new int[]{color(0, 255, 0), color(255, 204, 0), color(255, 0, 0)};
+    
+    int boardColor = colorScheme[0];
+    int ballColor = colorScheme[1];
+    board = new Board(width, height, boardColor);
+    ball = new Ball(width/2, height/2, width/25, ballColor);
+    flags = new CopyOnWriteArrayList<Flag>();
+    this.difficultyBuilder = new Difficulty(1, 1, 1, new int[0]);
+    this.difficulty = new Difficulty(1, 1, 1, new int[]{0});
+    this.gyroscopePointingMethod = new GyroscopePointingMethod();
+    setup();
+  }
+
+  SerialData update(SerialData input) {
+    // --- STATE 0: START MENU ---
+    if(input.gameState == 0 && input.button == 1) {
+      
+      difficulty = difficultyBuilder.fromSensorValue(input.potentiometer, 4);
+      int flagNum = difficulty.getFlagIndexes().length;
+      
+      for(int i = 0; i < flagNum; i++) {
+        flags.add(new Flag(
+          int(random(0, width)),
+          int(random(0, height)),
+          FLAG_COLORS[i%3],
+          15
+        ));
+      }
+      
+      flags.get(int(random(flags.size()))).makeTarget(); 
+      
+      input.gameState = 1;
+      println("GAME STARTED");
+    }
+    
+    // --- STATE 1: GAMEPLAY ---
+    if(input.gameState == 1) {
+      difficulty = difficultyBuilder.fromSensorValue(input.potentiometer, 4);
+
+      Flag target = null;
+      for(Flag flag : flags) {
+        if(flag.isTarget()) target = flag;
+      }
+      
+      if(target != null) { 
+        float distance = dist(ball.getX(), ball.getY(), target.x, target.y);
+        input.vibrationCoin = int(map(distance, 0, width, 1023, 0));
+      }
+      
+      // Keyboard simulation
+      if(keyPressed && keyCode == UP) ball.accelerate(0, -difficulty.getSpeedMultiplier());
+      if(keyPressed && keyCode == DOWN) ball.accelerate(0, difficulty.getSpeedMultiplier());
+      if(keyPressed && keyCode == LEFT) ball.accelerate(-difficulty.getSpeedMultiplier(), 0);
+      if(keyPressed && keyCode == RIGHT) ball.accelerate(difficulty.getSpeedMultiplier(), 0);
+
+      // Gyroscope movement
+      gyroscopePointingMethod.move(ball, input, difficulty);
+      
+      // Collision Loop
+      for(int i = flags.size()-1; i >= 0; i--) {
+        Flag flag = flags.get(i);
+        
+        if(collision(ball.getX(), ball.getY(), ball.getSize()/2, flag)) {
+          
+          if(!flag.isTarget()) {
+            //livesLeft--;
+            if(livesLeft <= 0) {
+              input.gameState = 3;
+            }
+          } else {
+            flags.remove(i);
+            if(flags.isEmpty() && livesLeft > 0) {
+              input.gameState = 2;
+            } else {
+              flags.get(int(random(flags.size()))).makeTarget();
+            }
+          }
+        }
+      }
+    }
+    
+    // --- STATE 2 & 3: WIN/LOSS ---
+    if(input.gameState == 2) {
+      input.vibrationCoin = 0;
+    }
+
+    if(input.gameState == 3) {
+      input.vibrationCoin = 0;
+    }
+
+    return input; 
+  }
+  
+  boolean collision(float x1, float y1, float rad1, Flag flag) {
+    float distance = dist(x1, y1, flag.x, flag.y);
+    return distance < (rad1 + flag.getSize()/2);
+  }
+  
+  void render(int currentState) {
+    board.draw();
+    ball.update();
+
+    for(Flag flag : flags) {
+      flag.draw();
+    }
+    for(int i = 0; i < livesLeft; i++) {
+      drawHeart(40*(i+1), 30, 1, colorScheme[2]); 
+    }
+    
+    if(currentState == 2) {
+      openVictoryWindow();
+    } else if(currentState == 3) {
+      openDefeatWindow();
+    }
+  }
+
+  void drawHeart(float centerX, float centerY, float radius, int c) {
+    fill(c);
+    beginShape();
+
+    for(float t = 0; t <= TWO_PI; t += 0.05) {
+      float x = 16 * pow(sin(t), 3);
+      float y = -(13 * cos(t) - 5 * cos(2*t) - 2 * cos(3*t) - cos(4*t));
+
+      vertex(centerX + (x * radius), centerY + (y * radius));
+    }
+
+    endShape(CLOSE);
+  }
+
+  void openVictoryWindow() {
+    fill(colorScheme[2]);
+    rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+
+    fill(0, 0, 0);
+    textSize(50);
+    text("Todas las banderas recogidas", width/2 - 125, height/2 - 25);
+
+    fill(255);
+    textSize(16);
+    text("Ahora completa el tablero", width/2 - 50, height/2 + 50);
+  }
+
+  void openDefeatWindow() {
+    fill(colorScheme[2]);
+    rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+
+    fill(0, 0, 0);
+    textSize(50);
+    text("Game Over", width/2 - 125, height/2 - 25);
+
+    fill(colorScheme[0]);
+    rect(width/2 - 75, height/2 + 25, 120, 40, 5);
+
+    fill(255);
+    textSize(16);
+    text("Reintentar", width/2 - 50, height/2 + 50);
+  }
+}
+</file>
+
+</files>

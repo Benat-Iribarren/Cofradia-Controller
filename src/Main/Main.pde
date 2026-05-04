@@ -6,7 +6,6 @@ SerialData outputData;
 SerialData previousState;
 
 int lastMessageTime = 0;
-boolean readyToSend = false;
 
 void setup() {
   fullScreen();
@@ -22,6 +21,7 @@ void setup() {
 void draw() {
   previousState = outputData;
   
+  arduino.updateSerial();
   inputData = arduino.read(previousState);
   print("Input: " + inputData.toString() + '\n');
   
@@ -33,29 +33,9 @@ void draw() {
     outputData = control.update(inputData);
   }
   
-  if (readyToSend == true) {
+  if (millis() - lastMessageTime > 50) {
     arduino.write(outputData);
-    readyToSend = false; 
     lastMessageTime = millis();
-  }
-  
-  if (millis() - lastMessageTime > 500) {
-    println("Handshake dropped! Restarting communication...");
-    if (arduino != null && outputData != null) {
-      arduino.write(outputData); 
-    }
-    lastMessageTime = millis(); 
-  }
-}
-
-void serialEvent(Serial p) {
-  if (arduino == null || game == null || control == null) return;
-
-  String input = p.readStringUntil('\n');
-  
-  if (input != null) {
-    arduino.parseData(input);
-    readyToSend = true;
   }
 }
 
