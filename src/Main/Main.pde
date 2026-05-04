@@ -3,35 +3,64 @@ GameController game;
 BoardController control;
 SerialData inputData;
 SerialData outputData;
+SerialData previousState;
+
+int lastMessageTime = 0;
+boolean readyToSend = false;
 
 void setup() {
-  //arduino = new ArduinoController(this, 0);
+  fullScreen();
+  
   game = new GameController();
   control = new BoardController(); 
   inputData = new SerialData();
+  outputData = new SerialData();
+  previousState = new SerialData();
+  arduino = new ArduinoController(this, 0);
 }
 
 void draw() {
-  if(frameCount == 60 * 3) inputData.button = 1;
+  previousState = outputData;
   
-  //SerialData inputData = arduino.read();
-  System.out.println("Input: " + inputData.toString());
-
-  if(inputData.gameState < 2) {
-    outputData = game.update(inputData);
-    System.out.println("Output: " + outputData.toString());
-    
-    if(inputData.gameState < 2) game.render();
+  inputData = arduino.read(previousState);
+  print("Input: " + inputData.toString() + '\n');
+  
+  if(inputData.gameState <= 3) {
+    outputData = game.update(inputData); 
+    print("Output: " + outputData.toString() + '\n');
+    game.render(inputData.gameState);                       
   } else {
     outputData = control.update(inputData);
-    System.out.println("Output: " + outputData.toString());
   }
   
-  //arduino.write(outputData);
-  
-  if(outputData.gameState == 2 && control == null) {
-    control = new BoardController();
+  if (readyToSend == true) {
+    arduino.write(outputData);
+    readyToSend = false; 
+    lastMessageTime = millis();
   }
   
-  inputData = outputData;
+  if (millis() - lastMessageTime > 500) {
+    println("Handshake dropped! Restarting communication...");
+    if (arduino != null && outputData != null) {
+      arduino.write(outputData); 
+    }
+    lastMessageTime = millis(); 
+  }
+}
+
+void serialEvent(Serial p) {
+  if (arduino == null || game == null || control == null) return;
+
+  String input = p.readStringUntil('\n');
+  
+  if (input != null) {
+    arduino.parseData(input);
+    readyToSend = true;
+  }
+}
+
+void keyPressed() {
+  if (key == ' ' && inputData.gameState == 0) {
+    inputData.button = 1; 
+  }
 }
