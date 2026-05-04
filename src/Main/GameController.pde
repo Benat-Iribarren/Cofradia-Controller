@@ -3,11 +3,13 @@ int[] COLOR_SCHEME_1 = {
   color(255, 182, 193),   // Rosa Pastel
   color(152, 255, 152)    // Verde Menta
 };
+
 int[] COLOR_SCHEME_2 = {
-    color(20, 0, 50),      // Morado Medianoche
-    color(0, 255, 255),    // Cyan Neon
-    color(255, 0, 255)     // Magenta Neon
+  color(20, 0, 50),       // Morado Medianoche
+  color(0, 255, 255),     // Cyan Neon
+  color(255, 0, 255)      // Magenta Neon
 };
+
 int[] COLOR_SCHEME_3 = {
   color(34, 139, 34),     // Verde Bosque
   color(238, 214, 175),   // Arena
@@ -24,6 +26,9 @@ class GameController {
   private int[] FLAG_COLORS;
   private int[] colorScheme = COLOR_SCHEME_3;
   
+  private Difficulty difficultyBuilder;
+  private Difficulty difficulty;
+  
   public GameController() {
     this.livesLeft = 3;
     FLAG_COLORS = new int[]{color(0, 255, 0), color(255, 204, 0), color(255, 0, 0)};
@@ -33,8 +38,11 @@ class GameController {
     board = new Board(width, height, boardColor);
     ball = new Ball(width/2, height/2, width/25, ballColor);
     flags = new CopyOnWriteArrayList<Flag>();
+    this.difficultyBuilder = new Difficulty(1, 1, 1, new int[0]);
+    this.difficulty = new Difficulty(1, 1, 1, new int[]{0});
+    setup();
   }
-  
+
   SerialData update(SerialData input) {
     // --- STATE 0: START MENU ---
     if(input.gameState == 0 && input.button == 1) {
@@ -53,6 +61,8 @@ class GameController {
     
     // --- STATE 1: GAMEPLAY ---
     if(input.gameState == 1) {
+      difficulty = difficultyBuilder.fromSensorValue(input.potentiometer, 4);
+
       Flag target = null;
       for(Flag flag : flags) {
         if(flag.isTarget()) target = flag;
@@ -96,7 +106,7 @@ class GameController {
     if(input.gameState == 2) {
       input.vibrationCoin = 0;
     }
-    
+
     if(input.gameState == 3) {
       input.vibrationCoin = 0;
     }
@@ -112,6 +122,7 @@ class GameController {
   void render(int currentState) {
     board.draw();
     ball.update();
+
     for(Flag flag : flags) {
       flag.draw();
     }
@@ -125,41 +136,45 @@ class GameController {
       openDefeatWindow();
     }
   }
-  
+
   void drawHeart(float centerX, float centerY, float radius, int c) {
     fill(c);
     beginShape();
-    for (float t = 0; t <= TWO_PI; t += 0.05) {
-      
+
+    for(float t = 0; t <= TWO_PI; t += 0.05) {
       float x = 16 * pow(sin(t), 3);
       float y = -(13 * cos(t) - 5 * cos(2*t) - 2 * cos(3*t) - cos(4*t));
-      
+
       vertex(centerX + (x * radius), centerY + (y * radius));
     }
+
     endShape(CLOSE);
   }
-  
+
   void openVictoryWindow() {
     fill(colorScheme[2]);
     rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+
     fill(0, 0, 0);
     textSize(50);
     text("Todas las banderas recogidas", width/2 - 125, height/2 - 25);
-    
-    fill(255); // White text for button
+
+    fill(255);
     textSize(16);
     text("Ahora completa el tablero", width/2 - 50, height/2 + 50);
   }
-  
+
   void openDefeatWindow() {
     fill(colorScheme[2]);
     rect(width/2 - 250, height/2 - 75, 500, 150, 20);
+
     fill(0, 0, 0);
     textSize(50);
     text("Game Over", width/2 - 125, height/2 - 25);
+
     fill(colorScheme[0]);
     rect(width/2 - 75, height/2 + 25, 120, 40, 5);
-    
+
     fill(255);
     textSize(16);
     text("Reintentar", width/2 - 50, height/2 + 50);
